@@ -249,7 +249,7 @@
 
     <div class="top-nav">
         <div id="level-indicator" style="margin-right: auto; font-size: 0.9rem; color: #888;">Level: 2.0</div>
-        <!--<button id="btn-settings" tabindex="-1">Settings</button>-->
+        <button id="btn-settings" tabindex="-1">Settings</button>
     </div>
 
     <div class="container">
@@ -267,8 +267,22 @@
     <div id="settings-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <h2>Trainer Settings</h2>
-            <p>Define your mental math challenge here.</p>
-            <p style="font-style: italic; color: #555;">(Setting controls will be implemented in this area.)</p>
+            <p>Select allowed operations:</p>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="setting-op-add" checked> Addition
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="setting-op-sub" checked> Subtraction
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="setting-op-mul" checked> Multiplication
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" id="setting-op-div" checked> Division
+                </label>
+            </div>
 
             <div class="modal-controls">
                 <button id="btn-settings-cancel">Cancel</button>
@@ -297,9 +311,16 @@
                 this.btnApply = document.getElementById('btn-settings-apply');
                 this.btnCancel = document.getElementById('btn-settings-cancel');
 
+                // Settings checkboxes
+                this.checkAdd = document.getElementById('setting-op-add');
+                this.checkSub = document.getElementById('setting-op-sub');
+                this.checkMul = document.getElementById('setting-op-mul');
+                this.checkDiv = document.getElementById('setting-op-div');
+
                 this._bindEvents();
                 this.onSubmitCallback = null;
                 this.onSkipCallback = null;
+                this.onApplySettingsCallback = null;
             }
 
             /**
@@ -364,7 +385,15 @@
             /**
              * Show the settings modal
              */
-            showSettings() {
+            showSettings(currentSettings) {
+                // Populate checkboxes
+                if (currentSettings && currentSettings.allowedOperations) {
+                    this.checkAdd.checked = currentSettings.allowedOperations.includes('add');
+                    this.checkSub.checked = currentSettings.allowedOperations.includes('sub');
+                    this.checkMul.checked = currentSettings.allowedOperations.includes('mul');
+                    this.checkDiv.checked = currentSettings.allowedOperations.includes('div');
+                }
+
                 this.modalEl.classList.remove('hidden');
                 this.inputEl.blur(); // Remove focus from main input when modal is open
             }
@@ -377,12 +406,25 @@
                 this.clearAndFocus(); // Re-focus on main task after modal closes
             }
 
+            getSettingsFromUI() {
+                const allowed = [];
+                if (this.checkAdd.checked) allowed.push('add');
+                if (this.checkSub.checked) allowed.push('sub');
+                if (this.checkMul.checked) allowed.push('mul');
+                if (this.checkDiv.checked) allowed.push('div');
+
+                return {
+                    allowedOperations: allowed
+                };
+            }
+
 
             /**
              * API Hooks for the Logic Controller
              */
             onSubmit(fn) { this.onSubmitCallback = fn; }
             onSkip(fn) { this.onSkipCallback = fn; }
+            onApplySettings(fn) { this.onApplySettingsCallback = fn; }
 
             // Internal event binding
             _bindEvents() {
@@ -397,14 +439,18 @@
                     this.clearAndFocus();
                 });
 
-                // NEW: Settings Button
-                // this.btnSettings.addEventListener('click', () => {
-                //     this.showSettings();
-                // });
 
                 // NEW: Settings Modal Buttons
                 this.btnApply.addEventListener('click', () => {
-                    // Placeholder for applying settings logic
+                    if (this.onApplySettingsCallback) {
+                        const newSettings = this.getSettingsFromUI();
+                        // Prevent disabling all operations
+                        if (newSettings.allowedOperations.length === 0) {
+                            alert("Please select at least one operation.");
+                            return;
+                        }
+                        this.onApplySettingsCallback(newSettings);
+                    }
                     this.hideSettings();
                 });
 
@@ -421,7 +467,9 @@
 
                 // Auto-focus on click anywhere (to keep flow going)
                 document.addEventListener('click', (e) => {
-                    if (e.target.tagName !== 'BUTTON' && e.target !== this.inputEl && this.modalEl.classList.contains('hidden')) {
+                    if (e.target.tagName !== 'BUTTON' && e.target !== this.inputEl &&
+                        !this.modalEl.contains(e.target) &&  // Don't steal focus if clicking inside modal
+                        this.modalEl.classList.contains('hidden')) {
                         this.inputEl.focus();
                     }
                 });
@@ -444,7 +492,10 @@
                         mul: { level: 2.0, streak: 0, correct: 0, total: 0 },
                         div: { level: 2.0, streak: 0, correct: 0, total: 0 }
                     },
-                    mistakeQueue: [] // Array of { text, solution, operation }
+                    mistakeQueue: [], // Array of { text, solution, operation }
+                    settings: {
+                        allowedOperations: ['add', 'sub', 'mul', 'div']
+                    }
                 };
                 this.load();
             }
@@ -455,6 +506,10 @@
                     if (stored) {
                         const loaded = JSON.parse(stored);
                         this.state = { ...this.state, ...loaded };
+                        // Ensure settings exist if loading from older v3 state
+                        if (!this.state.settings) {
+                            this.state.settings = { allowedOperations: ['add', 'sub', 'mul', 'div'] };
+                        }
                         console.log('State loaded:', this.state);
                     } else {
                         // Try to migrate from v2
@@ -487,6 +542,12 @@
                 } catch (e) {
                     console.error('Failed to save state', e);
                 }
+            }
+
+            updateSettings(newSettings) {
+                console.log('Updating settings:', newSettings);
+                this.state.settings = { ...this.state.settings, ...newSettings };
+                this.save();
             }
 
             recordResult(isCorrect, problem, operation) {
@@ -539,7 +600,12 @@
 
             getMistake() {
                 if (this.state.mistakeQueue.length === 0) return null;
-                return this.state.mistakeQueue[0];
+                // Filter mistakes to only show allowed operations
+                const allowed = this.state.settings.allowedOperations;
+                const allowedMistakes = this.state.mistakeQueue.filter(m => allowed.includes(m.operation || 'add'));
+
+                if (allowedMistakes.length === 0) return null;
+                return allowedMistakes[0]; // Return first allowed mistake
             }
         }
 
@@ -576,7 +642,7 @@
                 // a - b. 
                 // Difficulty is similar to addition of b + result = a
                 // But borrowing is the key. Borrowing is roughly equivalent to carrying.
-                // Let's just use the same logic as add for now, maybe slightly higher weight?
+                // Let's use the same logic as add for now, maybe slightly higher weight?
                 const digitsA = a.toString().length;
                 const digitsB = b.toString().length;
                 const borrows = this.countBorrows(a, b);
@@ -803,8 +869,11 @@
                 currentOperation = mistake.operation || 'add'; // Fallback if legacy
                 difficulty = state.getDifficulty(currentOperation);
             } else {
-                // Randomly select operation
-                const ops = ['add', 'sub', 'mul', 'div'];
+                // Randomly select operation from allowed settings
+                let ops = state.state.settings.allowedOperations;
+                console.log('Allowed ops:', ops);
+                if (!ops || ops.length === 0) ops = ['add']; // Fallback safety
+
                 currentOperation = ops[Math.floor(Math.random() * ops.length)];
 
                 difficulty = state.getDifficulty(currentOperation);
@@ -845,6 +914,18 @@
             // Skip counts as a failure? Or just a skip?
             // Let's count it as a failure to break streak but maybe not add to mistake queue?
             // For now, just generate new.
+            isRetry = false;
+            nextProblem();
+        });
+
+        // NEW: Handle settings open/apply
+        ui.btnSettings.addEventListener('click', () => {
+            ui.showSettings(state.state.settings);
+        });
+
+        ui.onApplySettings((newSettings) => {
+            state.updateSettings(newSettings);
+            // Always refresh problem on settings change to show immediate effect
             isRetry = false;
             nextProblem();
         });
