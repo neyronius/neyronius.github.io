@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus Math</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #1a1a1a;
+            --accent-color: #2563eb;
+            /* Sober Blue */
+            --error-color: #dc2626;
+            --success-color: #16a34a;
+            --subtle-gray: #e5e5e5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            /* Prevent scroll on mobile */
+        }
+
+        /* Main Layout */
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        /* The Problem Display */
+        #problem-view {
+            font-size: 4.5rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+            text-align: center;
+            line-height: 1.2;
+            transition: color 0.2s ease;
+        }
+
+        /* The Input Field */
+        #answer-input {
+            width: 100%;
+            max-width: 300px;
+            font-size: 3rem;
+            text-align: center;
+            border: none;
+            border-bottom: 3px solid var(--subtle-gray);
+            outline: none;
+            padding: 10px 0;
+            color: var(--text-color);
+            background: transparent;
+            transition: border-color 0.2s;
+            /* Hide number spinners */
+            -moz-appearance: textfield;
+        }
+
+        #answer-input::-webkit-outer-spin-button,
+        #answer-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        #answer-input:focus {
+            border-color: var(--accent-color);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+            /* Allow wrapping on very small screens */
+            justify-content: center;
+        }
+
+        button {
+            font-family: inherit;
+            font-size: 1rem;
+            padding: 12px 32px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            border: none;
+        }
+
+        button:active {
+            transform: scale(0.96);
+        }
+
+        #btn-skip,
+        #btn-settings {
+            background: transparent;
+            color: #666;
+            border: 2px solid transparent;
+        }
+
+        #btn-skip:hover,
+        #btn-settings:hover {
+            color: #000;
+            background-color: #f5f5f5;
+        }
+
+        #btn-enter {
+            background-color: var(--text-color);
+            color: white;
+            font-weight: 600;
+        }
+
+        #btn-enter:hover {
+            opacity: 0.9;
+        }
+
+        /* Feedback Animations */
+        @keyframes shake {
+            0% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-10px);
+            }
+
+            50% {
+                transform: translateX(10px);
+            }
+
+            75% {
+                transform: translateX(-10px);
+            }
+
+            100% {
+                transform: translateX(0);
+            }
+        }
+
+        .shake-anim {
+            animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+            color: var(--error-color) !important;
+        }
+
+        .success-flash {
+            color: var(--success-color) !important;
+        }
+
+        /* Top Navigation */
+        .top-nav {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease, visibility 0.3s;
+        }
+
+        .modal-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .modal-content {
+            background-color: var(--bg-color);
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .modal-content h2 {
+            font-size: 1.5rem;
+            border-bottom: 2px solid var(--subtle-gray);
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+
+        .modal-controls {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        #btn-settings-apply {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 10px 20px;
+        }
+
+        #btn-settings-cancel {
+            background-color: var(--subtle-gray);
+            color: var(--text-color);
+            padding: 10px 20px;
+        }
+
+
+        /* Mobile responsiveness helper */
+        @media (max-height: 600px) {
+            #problem-view {
+                font-size: 3rem;
+            }
+
+            #answer-input {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="top-nav">
+        <div id="level-indicator" style="margin-right: auto; font-size: 0.9rem; color: #888;">Level: 2.0</div>
+        <!--<button id="btn-settings" tabindex="-1">Settings</button>-->
+    </div>
+
+    <div class="container">
+        <div id="problem-view">Loading...</div>
+
+        <input type="text" inputmode="numeric" pattern="[0-9]*" id="answer-input" placeholder="" autocomplete="off">
+
+        <div class="controls">
+            <button id="btn-skip" tabindex="-1">Skip</button>
+            <button id="btn-enter">Enter</button>
+        </div>
+    </div>
+
+    <!-- NEW: Settings Modal Overlay -->
+    <div id="settings-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2>Trainer Settings</h2>
+            <p>Define your mental math challenge here.</p>
+            <p style="font-style: italic; color: #555;">(Setting controls will be implemented in this area.)</p>
+
+            <div class="modal-controls">
+                <button id="btn-settings-cancel">Cancel</button>
+                <button id="btn-settings-apply">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * UI MANAGER API
+         * Handles all DOM interactions and visual states.
+         * Does not contain game rules, only display logic.
+         */
+        class TrainerUI {
+            constructor() {
+                this.problemEl = document.getElementById('problem-view');
+                this.inputEl = document.getElementById('answer-input');
+                this.btnSkip = document.getElementById('btn-skip');
+                this.btnEnter = document.getElementById('btn-enter');
+                this.levelEl = document.getElementById('level-indicator');
+
+                // NEW: Settings elements
+                this.btnSettings = document.getElementById('btn-settings');
+                this.modalEl = document.getElementById('settings-modal');
+                this.btnApply = document.getElementById('btn-settings-apply');
+                this.btnCancel = document.getElementById('btn-settings-cancel');
+
+                this._bindEvents();
+                this.onSubmitCallback = null;
+                this.onSkipCallback = null;
+            }
+
+            /**
+             * Set the math problem text (e.g., "12 + 5")
+             */
+            setProblem(text, level, operation) {
+                this.problemEl.textContent = text;
+                if (level && operation) {
+                    const opNames = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division' };
+                    this.levelEl.textContent = `${opNames[operation] || operation} Level: ${level.toFixed(1)}`;
+                } else if (level) {
+                    this.levelEl.textContent = `Level: ${level.toFixed(1)}`;
+                }
+                this.resetFeedbackStyles();
+            }
+
+            /**
+             * Get the current user input as a Number
+             * Returns null if empty or invalid
+             */
+            getAnswer() {
+                const val = this.inputEl.value.trim();
+                // We use isNaN check to handle cases where inputmode="numeric" isn't fully respected 
+                // and the user inputs non-numeric characters.
+                const num = Number(val);
+                return val === '' || isNaN(num) ? null : num;
+            }
+
+            /**
+             * Clear input field and focus it
+             */
+            clearAndFocus() {
+                this.inputEl.value = '';
+                this.inputEl.focus();
+            }
+
+            /**
+             * Visual feedback for correct answer
+             */
+            triggerSuccess() {
+                this.problemEl.classList.add('success-flash');
+                setTimeout(() => this.problemEl.classList.remove('success-flash'), 300);
+            }
+
+            /**
+             * Visual feedback for wrong answer
+             */
+            triggerError() {
+                this.problemEl.classList.add('shake-anim');
+                this.inputEl.classList.add('shake-anim');
+                setTimeout(() => {
+                    this.resetFeedbackStyles();
+                }, 400);
+                this.inputEl.select(); // Select text for easy overwrite
+            }
+
+            resetFeedbackStyles() {
+                this.problemEl.classList.remove('shake-anim', 'success-flash');
+                this.inputEl.classList.remove('shake-anim');
+            }
+
+            /**
+             * Show the settings modal
+             */
+            showSettings() {
+                this.modalEl.classList.remove('hidden');
+                this.inputEl.blur(); // Remove focus from main input when modal is open
+            }
+
+            /**
+             * Hide the settings modal
+             */
+            hideSettings() {
+                this.modalEl.classList.add('hidden');
+                this.clearAndFocus(); // Re-focus on main task after modal closes
+            }
+
+
+            /**
+             * API Hooks for the Logic Controller
+             */
+            onSubmit(fn) { this.onSubmitCallback = fn; }
+            onSkip(fn) { this.onSkipCallback = fn; }
+
+            // Internal event binding
+            _bindEvents() {
+                // Enter Button
+                this.btnEnter.addEventListener('click', () => {
+                    if (this.onSubmitCallback) this.onSubmitCallback();
+                });
+
+                // Skip Button
+                this.btnSkip.addEventListener('click', () => {
+                    if (this.onSkipCallback) this.onSkipCallback();
+                    this.clearAndFocus();
+                });
+
+                // NEW: Settings Button
+                // this.btnSettings.addEventListener('click', () => {
+                //     this.showSettings();
+                // });
+
+                // NEW: Settings Modal Buttons
+                this.btnApply.addEventListener('click', () => {
+                    // Placeholder for applying settings logic
+                    this.hideSettings();
+                });
+
+                this.btnCancel.addEventListener('click', () => {
+                    this.hideSettings();
+                });
+
+                // Keyboard: Enter to submit
+                this.inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        if (this.onSubmitCallback) this.onSubmitCallback();
+                    }
+                });
+
+                // Auto-focus on click anywhere (to keep flow going)
+                document.addEventListener('click', (e) => {
+                    if (e.target.tagName !== 'BUTTON' && e.target !== this.inputEl && this.modalEl.classList.contains('hidden')) {
+                        this.inputEl.focus();
+                    }
+                });
+            }
+        }
+
+        // ==========================================
+        // STATE MANAGEMENT
+        // ==========================================
+        // ==========================================
+        // STATE MANAGEMENT
+        // ==========================================
+        class TrainerState {
+            constructor() {
+                this.storageKey = 'focusMathState_v3'; // New key for granular levels
+                this.state = {
+                    operations: {
+                        add: { level: 2.0, streak: 0, correct: 0, total: 0 },
+                        sub: { level: 2.0, streak: 0, correct: 0, total: 0 },
+                        mul: { level: 2.0, streak: 0, correct: 0, total: 0 },
+                        div: { level: 2.0, streak: 0, correct: 0, total: 0 }
+                    },
+                    mistakeQueue: [] // Array of { text, solution, operation }
+                };
+                this.load();
+            }
+
+            load() {
+                try {
+                    const stored = localStorage.getItem(this.storageKey);
+                    if (stored) {
+                        const loaded = JSON.parse(stored);
+                        this.state = { ...this.state, ...loaded };
+                        console.log('State loaded:', this.state);
+                    } else {
+                        // Try to migrate from v2
+                        const oldStored = localStorage.getItem('focusMathState_v2');
+                        if (oldStored) {
+                            console.log('Migrating from v2 state...');
+                            const oldState = JSON.parse(oldStored);
+                            ['add', 'sub', 'mul', 'div'].forEach(op => {
+                                if (oldState.operations && oldState.operations[op]) {
+                                    // Map old integer levels to new float levels roughly
+                                    // Level 1 -> 2.0
+                                    // Level 2 -> 4.0
+                                    // Level 3 -> 6.0
+                                    this.state.operations[op].level = Math.max(2.0, oldState.operations[op].level * 2.0);
+                                }
+                            });
+                            this.state.mistakeQueue = oldState.mistakeQueue || [];
+                            this.save();
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to load state', e);
+                }
+            }
+
+            save() {
+                try {
+                    localStorage.setItem(this.storageKey, JSON.stringify(this.state));
+                    console.log('State saved:', this.state);
+                } catch (e) {
+                    console.error('Failed to save state', e);
+                }
+            }
+
+            recordResult(isCorrect, problem, operation) {
+                if (!this.state.operations[operation]) {
+                    console.error('Unknown operation:', operation);
+                    return;
+                }
+
+                const opStats = this.state.operations[operation];
+                opStats.total++;
+
+                if (isCorrect) {
+                    opStats.correct++;
+                    opStats.streak++;
+
+                    // Remove from mistake queue if it was a retry
+                    if (this.state.mistakeQueue.length > 0) {
+                        this.state.mistakeQueue = this.state.mistakeQueue.filter(p => p.text !== problem.text);
+                    }
+
+                    // Increase difficulty gradually
+                    // We want to find the user's ceiling.
+                    // If streak > 3, we nudge up.
+                    if (opStats.streak > 3) {
+                        opStats.level += 0.2; // Small increment
+                        // Cap at some reasonable max if needed, e.g. 20
+                        opStats.level = Math.min(opStats.level, 20.0);
+                    }
+                } else {
+                    opStats.streak = 0;
+                    // Add to mistake queue if not already there
+                    const exists = this.state.mistakeQueue.some(p => p.text === problem.text);
+                    if (!exists) {
+                        this.state.mistakeQueue.push({ ...problem, operation });
+                    }
+
+                    // Decrease difficulty if struggling
+                    // If we fail, we drop a bit to rebuild confidence
+                    opStats.level = Math.max(1.0, opStats.level - 0.5);
+                }
+                // Round level to 1 decimal for cleanliness
+                opStats.level = Math.round(opStats.level * 10) / 10;
+
+                this.save();
+            }
+
+            getDifficulty(operation) {
+                return this.state.operations[operation] ? this.state.operations[operation].level : 2.0;
+            }
+
+            getMistake() {
+                if (this.state.mistakeQueue.length === 0) return null;
+                return this.state.mistakeQueue[0];
+            }
+        }
+
+        // ==========================================
+        // DIFFICULTY ESTIMATOR
+        // ==========================================
+        class DifficultyEstimator {
+            static calculate(problem, operation) {
+                // Parse numbers from text "a op b"
+                // This is a bit hacky, but works for our simple format
+                const parts = problem.text.split(' ');
+                const a = parseInt(parts[0]);
+                const b = parseInt(parts[2]);
+
+                switch (operation) {
+                    case 'add': return this.addCost(a, b);
+                    case 'sub': return this.subCost(a, b); // Sub is inverse of add
+                    case 'mul': return this.mulCost(a, b);
+                    case 'div': return this.divCost(a, b);
+                    default: return 1;
+                }
+            }
+
+            static addCost(a, b) {
+                const digitsA = a.toString().length;
+                const digitsB = b.toString().length;
+                const carries = this.countCarries(a, b);
+                // Base cost: reading/processing digits (0.5 per digit)
+                // Operation cost: 2.0 per carry (mental load)
+                return (digitsA + digitsB) * 0.5 + carries * 2.0;
+            }
+
+            static subCost(a, b) {
+                // a - b. 
+                // Difficulty is similar to addition of b + result = a
+                // But borrowing is the key. Borrowing is roughly equivalent to carrying.
+                // Let's just use the same logic as add for now, maybe slightly higher weight?
+                const digitsA = a.toString().length;
+                const digitsB = b.toString().length;
+                const borrows = this.countBorrows(a, b);
+                return (digitsA + digitsB) * 0.5 + borrows * 2.5;
+            }
+
+            static mulCost(a, b) {
+                const digitsA = a.toString().length;
+                const digitsB = b.toString().length;
+                // Naive estimation: sum of single digit multiplications + additions
+                // 12 * 3 = (10*3) + (2*3). 
+                // 12 * 34 = (10*34) + (2*34) ... complex.
+
+                // Simple heuristic: 
+                // 1x1 = diff 1-2
+                // 2x1 = diff 3-5
+                // 2x2 = diff 8-12
+
+                // Let's use: (digitsA * digitsB) * 1.5 + (digitsA + digitsB) * 0.5
+                // Plus penalty for larger digits (6,7,8,9 are harder than 1,2,3)
+
+                const valCost = (this.digitComplexity(a) + this.digitComplexity(b)) * 0.2;
+                return (digitsA * digitsB) * 2.0 + valCost;
+            }
+
+            static divCost(a, b) {
+                // a / b = result
+                // Difficulty is mostly about finding the factor.
+                // Similar to multiplication of b * result = a
+                const res = a / b;
+                return this.mulCost(b, res);
+            }
+
+            static countCarries(a, b) {
+                let carries = 0;
+                let carry = 0;
+                while (a > 0 || b > 0 || carry > 0) {
+                    let sum = (a % 10) + (b % 10) + carry;
+                    if (sum >= 10) {
+                        carries++;
+                        carry = 1;
+                    } else {
+                        carry = 0;
+                    }
+                    a = Math.floor(a / 10);
+                    b = Math.floor(b / 10);
+                }
+                return carries;
+            }
+
+            static countBorrows(a, b) {
+                let borrows = 0;
+                let borrow = 0;
+                // a is minuend, b is subtrahend. a >= b assumed.
+                while (a > 0 || b > 0) {
+                    let valA = (a % 10) - borrow;
+                    let valB = (b % 10);
+                    if (valA < valB) {
+                        borrows++;
+                        borrow = 1;
+                    } else {
+                        borrow = 0;
+                    }
+                    a = Math.floor(a / 10);
+                    b = Math.floor(b / 10);
+                }
+                return borrows;
+            }
+
+            static digitComplexity(n) {
+                // Sum of digits, weighted by value (0,1,2,5 are easy; 3,4,6,7,8,9 harder)
+                let score = 0;
+                const s = n.toString();
+                for (let char of s) {
+                    const d = parseInt(char);
+                    if (d > 2 && d !== 5) score += 1;
+                }
+                return score;
+            }
+        }
+
+        // ==========================================
+        // PROBLEM GENERATOR
+        // ==========================================
+        class ProblemGenerator {
+            static generate(operation, targetDifficulty) {
+                try {
+                    // Rejection sampling / Candidate generation
+                    // We generate N candidates around a heuristic range, calculate their true difficulty,
+                    // and pick the one closest to targetDifficulty.
+
+                    const candidates = [];
+                    const attempts = 20;
+
+                    // Heuristic range determination
+                    // We want a range that likely contains problems of targetDifficulty.
+                    // Diff ~= digits * k. So digits ~= Diff / k.
+                    // Max val ~= 10 ^ digits.
+
+                    let maxVal = 10;
+                    if (operation === 'add' || operation === 'sub') {
+                        // Diff 2 -> 1 digit (10)
+                        // Diff 4 -> 2 digits (100)
+                        // Diff 8 -> 3 digits (1000)
+                        maxVal = Math.pow(10, Math.max(1, targetDifficulty / 2.5));
+                    } else {
+                        // Mul/Div grows faster
+                        // Diff 2 -> 1x1 (10)
+                        // Diff 5 -> 2x1 (100)
+                        // Diff 10 -> 2x2 (100)
+                        maxVal = Math.pow(10, Math.max(1, targetDifficulty / 3.0));
+                    }
+
+                    // Clamp maxVal
+                    maxVal = Math.min(maxVal, 10000);
+                    const minVal = Math.max(1, Math.floor(maxVal / 20)); // Don't go too small
+
+                    for (let i = 0; i < attempts; i++) {
+                        let p = null;
+                        // Generate raw numbers based on operation type logic (to ensure valid integer results etc)
+                        switch (operation) {
+                            case 'add': p = this.randAdd(minVal, maxVal); break;
+                            case 'sub': p = this.randSub(minVal, maxVal); break;
+                            case 'mul': p = this.randMul(minVal, Math.sqrt(maxVal) * 3); break; // Adjust for product
+                            case 'div': p = this.randDiv(2, Math.sqrt(maxVal) * 2, 2, Math.sqrt(maxVal) * 2); break;
+                        }
+
+                        if (p) {
+                            p.difficulty = DifficultyEstimator.calculate(p, operation);
+                            p.diffDiff = Math.abs(p.difficulty - targetDifficulty);
+                            candidates.push(p);
+                        }
+                    }
+
+                    if (candidates.length === 0) {
+                        console.warn('No candidates generated, using fallback');
+                        return this.getFallback(operation);
+                    }
+
+                    // Sort by closeness to target difficulty
+                    candidates.sort((a, b) => a.diffDiff - b.diffDiff);
+
+                    // Pick the best one, or random among top 3 to avoid repetition if they are identical
+                    const best = candidates.slice(0, 3);
+                    return best[Math.floor(Math.random() * best.length)];
+                } catch (e) {
+                    console.error('Error generating problem:', e);
+                    return this.getFallback(operation);
+                }
+            }
+
+            static getFallback(operation) {
+                switch (operation) {
+                    case 'add': return { text: '1 + 1', solution: 2 };
+                    case 'sub': return { text: '2 - 1', solution: 1 };
+                    case 'mul': return { text: '2 × 2', solution: 4 };
+                    case 'div': return { text: '4 ÷ 2', solution: 2 };
+                    default: return { text: '1 + 1', solution: 2 };
+                }
+            }
+
+            static randAdd(min, max) {
+                const a = this.rand(min, max);
+                const b = this.rand(min, max);
+                return { text: `${a} + ${b}`, solution: a + b };
+            }
+
+            static randSub(min, max) {
+                let a = this.rand(min, max);
+                let b = this.rand(min, max);
+                if (b > a) [a, b] = [b, a];
+                return { text: `${a} - ${b}`, solution: a - b };
+            }
+
+            static randMul(min, max) {
+                // For mul, inputs should be smaller
+                // Ensure min/max are integers for the sub-range
+                const minA = Math.floor(Math.max(2, min / 2));
+                const maxA = Math.floor(Math.max(9, max));
+                const a = this.rand(minA, maxA);
+                const b = this.rand(minA, maxA);
+                return { text: `${a} × ${b}`, solution: a * b };
+            }
+
+            static randDiv(minB, maxB, minRes, maxRes) {
+                const b = this.rand(Math.floor(minB), Math.floor(maxB));
+                const res = this.rand(Math.floor(minRes), Math.floor(maxRes));
+                const a = b * res;
+                return { text: `${a} ÷ ${b}`, solution: res };
+            }
+
+            static rand(min, max) {
+                // Ensure min and max are integers
+                min = Math.ceil(min);
+                max = Math.floor(max);
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+        }
+
+
+        // ==========================================
+        // LOGIC CONTROLLER
+        // ==========================================
+
+        const ui = new TrainerUI();
+        const state = new TrainerState();
+
+        let currentProblem = null;
+        let currentOperation = 'add'; // Track current operation
+        let isRetry = false;
+
+        function nextProblem() {
+            if (isRetry && currentProblem) {
+                ui.setProblem(currentProblem.text);
+                ui.clearAndFocus();
+                return;
+            }
+
+            // Check for mistake queue
+            const mistake = state.getMistake();
+            let difficulty = 0;
+            if (mistake && Math.random() < 0.3) {
+                currentProblem = mistake;
+                currentOperation = mistake.operation || 'add'; // Fallback if legacy
+                difficulty = state.getDifficulty(currentOperation);
+            } else {
+                // Randomly select operation
+                const ops = ['add', 'sub', 'mul', 'div'];
+                currentOperation = ops[Math.floor(Math.random() * ops.length)];
+
+                difficulty = state.getDifficulty(currentOperation);
+                currentProblem = ProblemGenerator.generate(currentOperation, difficulty);
+            }
+
+            ui.setProblem(currentProblem.text, difficulty, currentOperation);
+            ui.clearAndFocus();
+
+            // Debug info
+            const stats = state.state.operations[currentOperation];
+            console.log(`Op: ${currentOperation}, Level: ${stats.level}, Streak: ${stats.streak}, Mistakes: ${state.state.mistakeQueue.length}`);
+        }
+
+        // Hook up the API
+        ui.onSubmit(() => {
+            const userAnswer = ui.getAnswer();
+            if (userAnswer === null) return;
+
+            if (userAnswer === currentProblem.solution) {
+                // CORRECT
+                state.recordResult(true, currentProblem, currentOperation);
+                ui.triggerSuccess();
+                isRetry = false;
+                setTimeout(nextProblem, 150);
+            } else {
+                // INCORRECT
+                state.recordResult(false, currentProblem, currentOperation);
+                ui.triggerError();
+                isRetry = true; // Force retry
+                // We don't generate a new problem, we just let the user try again.
+                // The UI shake animation is the feedback.
+                // We might want to clear the input or select it (UI class does select).
+            }
+        });
+
+        ui.onSkip(() => {
+            // Skip counts as a failure? Or just a skip?
+            // Let's count it as a failure to break streak but maybe not add to mistake queue?
+            // For now, just generate new.
+            isRetry = false;
+            nextProblem();
+        });
+
+        // Start the app
+        nextProblem();
+
+    </script>
+</body>
+
+</html>
